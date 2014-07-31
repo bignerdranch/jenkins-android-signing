@@ -10,6 +10,8 @@
   <artifactId>android-signing</artifactId>
   <version>1.0-SNAPSHOT</version>
   <packaging>hpi</packaging>
+  <name>Android Signing Plugin</name>
+  <description>Allows for signing of Android applications.</description>
 
   <licenses>
     <license>
@@ -17,6 +19,15 @@
       <url>http://opensource.org/licenses/MIT</url>
     </license>
   </licenses>
+
+    <developers>
+        <developer>
+            <id>kurtisnelson</id>
+            <name>Kurt Nelson</name>
+            <organization>Big Nerd Ranch</organization>
+            <email>kurtisnelson@gmail.com</email>
+        </developer>
+    </developers>
 
   <!-- get every artifact through repo.jenkins-ci.org, which proxies all the artifacts that we need -->
   <repositories>
@@ -33,4 +44,25 @@
     </pluginRepository>
   </pluginRepositories>
 
+    <dependencies>
+        <dependency>
+            <groupId>org.jenkins-ci.plugins</groupId>
+            <artifactId>credentials</artifactId>
+            <version>1.14</version>
+        </dependency>
+    </dependencies>
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.jenkins-ci.tools</groupId>
+                <artifactId>maven-hpi-plugin</artifactId>
+                <configuration>
+                    <compatibleSinceVersion>1.0-beta-4</compatibleSinceVersion>
+                    <loggers>
+                        <org.jenkinsci.plugins.plaincredentials>FINE</org.jenkinsci.plugins.plaincredentials>
+                    </loggers>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
 </project>

@@ -1,0 +1,32 @@
+<?jelly escape-by-default='true'?>
+<j:jelly xmlns:j="jelly:core" xmlns:f="/lib/form">
+    <f:invisibleEntry>
+        <f:textbox field="id"/>
+    </f:invisibleEntry>
+    <j:choose>
+        <j:when test="${instance == null}">
+            <f:entry title="${%File}" field="file">
+                <input type="file" name="file" size="40" jsonAware="yes"/>
+            </f:entry>
+        </j:when>
+        <j:otherwise>
+            <f:invisibleEntry>
+                <f:textbox field="fileName"/>
+            </f:invisibleEntry>
+            <f:invisibleEntry>
+                <f:textbox field="data"/>
+            </f:invisibleEntry>
+            <f:optionalBlock title="${%upload(instance.fileName)}" inline="true">
+                <f:entry title="${%File}" field="file">
+                    <input type="file" name="file" size="40" jsonAware="yes"/>
+                </f:entry>
+            </f:optionalBlock>
+        </j:otherwise>
+    </j:choose>
+    <f:entry title="${%Passphrase}" field="passphrase">
+        <f:textbox field="passphrase"/>
+    </f:entry>
+    <f:entry title="${%Description}" field="description">
+        <f:textbox/>
+    </f:entry>
+</j:jelly>

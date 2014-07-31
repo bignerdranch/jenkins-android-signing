@@ -14,13 +14,8 @@ import org.kohsuke.stapler.DataBoundConstructor;
 
 import javax.annotation.CheckForNull;
 import javax.annotation.Nonnull;
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
+import java.io.*;
 import java.security.GeneralSecurityException;
-import java.security.KeyStore;
-import java.security.KeyStoreException;
-import java.security.NoSuchAlgorithmException;
-import java.security.cert.CertificateException;
 
 
 public class KeystoreCredentialsImpl extends BaseStandardCredentials implements KeystoreCredentials{
@@ -49,22 +44,25 @@ public class KeystoreCredentialsImpl extends BaseStandardCredentials implements 
         this.password = Secret.fromString(password);
     }
 
+    public String getTempPath() throws IOException {
+        File tmp = File.createTempFile("keystore", null);
+        FileOutputStream out = new FileOutputStream(tmp);
+        out.write(unencrypted());
+        out.close();
+        tmp.deleteOnExit();
+        return tmp.getAbsolutePath();
+    }
+
     public String getFileName() {
         return fileName;
     }
 
-    public KeyStore getContent() throws IOException {
-        try {
-            KeyStore ks = KeyStore.getInstance(KeyStore.getDefaultType());
-            ks.load(new ByteArrayInputStream(unencrypted()), password.getPlainText().toCharArray());
-            return ks;
-        } catch (NoSuchAlgorithmException e) {
-            throw new IOException2(e);
-        } catch (CertificateException e) {
-            throw new IOException2(e);
-        } catch (KeyStoreException e) {
-            throw new IOException2(e);
-        }
+    public InputStream getContent() throws IOException {
+        return new ByteArrayInputStream(unencrypted());
+    }
+
+    public String getPassphrase() {
+        return password.getPlainText();
     }
 
     private byte[] unencrypted() throws IOException {

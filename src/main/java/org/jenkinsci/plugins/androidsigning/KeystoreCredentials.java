@@ -7,12 +7,16 @@ import hudson.Util;
 
 import javax.annotation.Nonnull;
 import java.io.IOException;
-import java.security.KeyStore;
+import java.io.InputStream;
 
 @NameWith(KeystoreCredentials.NameProvider.class)
 public interface KeystoreCredentials extends StandardCredentials {
     @Nonnull String getFileName();
-    @Nonnull KeyStore getContent() throws IOException;
+    @Nonnull
+    InputStream getContent() throws IOException;
+    @Nonnull String getPassphrase();
+
+    String getTempPath() throws IOException;
 
     class NameProvider extends CredentialsNameProvider<KeystoreCredentials> {
         @Override public String getName(KeystoreCredentials c) {

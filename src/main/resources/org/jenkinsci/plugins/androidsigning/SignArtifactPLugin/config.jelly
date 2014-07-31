@@ -6,7 +6,7 @@
 
       <table width="100%">
 
-        <f:entry field="keyStore" title="${%Keystore}">
+        <f:entry field="keystore" title="${%Keystore}">
           <f:select value="${apks.keystore}" />
         </f:entry>
                 <f:entry field="alias" title="${%Key Alias}">

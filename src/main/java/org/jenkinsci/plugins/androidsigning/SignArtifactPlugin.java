@@ -18,26 +18,23 @@ import hudson.util.ArgumentListBuilder;
 import hudson.util.FormValidation;
 import hudson.util.ListBoxModel;
 import jenkins.model.Jenkins;
-import net.sf.json.JSONObject;
 import org.apache.commons.lang.ArrayUtils;
 import org.kohsuke.stapler.AncestorInPath;
 import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.QueryParameter;
-import org.kohsuke.stapler.StaplerRequest;
 
 import java.io.*;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.StringTokenizer;
 
 public class SignArtifactPlugin extends Recorder {
 
-    private List<Entry> entries = Collections.emptyList();
+    private List<Apk> entries = Collections.emptyList();
 
     @DataBoundConstructor
-    public SignArtifactPlugin(List<Entry> rpms) {
-        this.entries = rpms;
+    public SignArtifactPlugin(List<Apk> apks) {
+        this.entries = apks;
         if (this.entries == null) {
             this.entries = Collections.emptyList();
         }
@@ -57,18 +54,19 @@ public class SignArtifactPlugin extends Recorder {
     }
 
     @SuppressWarnings("unused")
-    public List<Entry> getEntries() {
+    public List<Apk> getEntries() {
         return entries;
     }
 
     @Override
     public boolean perform(AbstractBuild<?, ?> build, Launcher launcher, BuildListener listener) throws InterruptedException, IOException {
         if (isPerformDeployment(build)) {
-            listener.getLogger().println("[RpmSignPlugin] - Starting signing RPMs ...");
+            listener.getLogger().println("[AndroidSignPlugin] - Starting signing APKs ...");
 
-            for (Entry rpmEntry : entries) {
-                StringTokenizer rpmGlobTokenizer = new StringTokenizer(rpmEntry.getSelection(), ",");
-                KeystoreCredentials keystore = getKeystore(rpmEntry.getKeyStore());
+            for (Apk rpmApk : entries) {
+                StringTokenizer rpmGlobTokenizer = new StringTokenizer(rpmApk.getSelection(), ",");
+                KeystoreCredentials keystore = getKeystore(rpmApk.getKeyStore());
+                listener.getLogger().println("[AndroidSignPlugin] Signing " + rpmGlobTokenizer.countTokens() + " APKs");
                 while (rpmGlobTokenizer.hasMoreTokens()) {
                     String rpmGlob = rpmGlobTokenizer.nextToken();
 
@@ -87,7 +85,7 @@ public class SignArtifactPlugin extends Recorder {
                             rpmSignCommand.add("-digestalg", "SHA1");
                             rpmSignCommand.add("-keystore", keystore.getTempPath());
                             rpmSignCommand.add(rpmFilePath.toURI().normalize().getPath());
-                            rpmSignCommand.add(rpmEntry.getAlias());
+                            rpmSignCommand.add(rpmApk.getAlias());
 
                             String rpmCommandLine = rpmSignCommand.toString();
                             listener.getLogger().println("[RpmSignPlugin] - Running " + rpmCommandLine);
@@ -160,7 +158,7 @@ public class SignArtifactPlugin extends Recorder {
 
     @Extension
     @SuppressWarnings("unused")
-    public static final class GpgSignerDescriptor extends BuildStepDescriptor<Publisher> {
+    public static final class SignArtifactDescriptor extends BuildStepDescriptor<Publisher> {
 
         public static final String DISPLAY_NAME = Messages.job_displayName();
 
@@ -169,7 +167,8 @@ public class SignArtifactPlugin extends Recorder {
             return true;
         }
 
-        public GpgSignerDescriptor() {
+        public SignArtifactDescriptor() {
+            super();
             load();
         }
 
@@ -178,7 +177,7 @@ public class SignArtifactPlugin extends Recorder {
             return DISPLAY_NAME;
         }
 
-        public ListBoxModel doFillKeyStoreItems() {
+        public ListBoxModel doFillKeystoreItems() {
             ListBoxModel items = new ListBoxModel();
             for (KeystoreCredentials gpgKey : CredentialsProvider.lookupCredentials(KeystoreCredentials.class, Jenkins.getInstance(), ACL.SYSTEM)) {
                 items.add(gpgKey.getDescription(), gpgKey.getId());
@@ -186,19 +185,11 @@ public class SignArtifactPlugin extends Recorder {
             return items;
         }
 
-        public FormValidation doCheckName(@AncestorInPath AbstractProject project, @QueryParameter String value) throws IOException {
+        public FormValidation doCheckAlias(@AncestorInPath AbstractProject project, @QueryParameter String value) throws IOException {
             return FormValidation.validateRequired(value);
         }
 
-        public FormValidation doCheckPrivateKey(@AncestorInPath AbstractProject project, @QueryParameter String value) throws IOException {
-            return FormValidation.validateRequired(value);
-        }
-
-        public FormValidation doCheckPassphrase(@AncestorInPath AbstractProject project, @QueryParameter String value) throws IOException {
-            return FormValidation.validateRequired(value);
-        }
-
-        public FormValidation doCheckIncludes(@AncestorInPath AbstractProject project, @QueryParameter String value) throws IOException, InterruptedException {
+        public FormValidation doCheckSelection(@AncestorInPath AbstractProject project, @QueryParameter String value) throws IOException, InterruptedException {
             if (project.getSomeWorkspace() != null) {
                 String msg = project.getSomeWorkspace().validateAntFileMask(value);
                 if (msg != null) {

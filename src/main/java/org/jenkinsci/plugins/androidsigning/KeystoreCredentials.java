@@ -5,6 +5,7 @@ import com.cloudbees.plugins.credentials.NameWith;
 import com.cloudbees.plugins.credentials.common.StandardCredentials;
 import hudson.FilePath;
 import hudson.Util;
+import hudson.util.Secret;
 
 import javax.annotation.Nonnull;
 import java.io.IOException;
@@ -15,7 +16,7 @@ public interface KeystoreCredentials extends StandardCredentials {
     @Nonnull String getFileName();
     @Nonnull
     InputStream getContent() throws IOException;
-    @Nonnull String getPassphrase();
+    @Nonnull Secret getPassphrase();
 
     public FilePath makeTempPath(FilePath path) throws IOException, InterruptedException;
 

@@ -61,8 +61,8 @@ public class KeystoreCredentialsImpl extends BaseStandardCredentials implements 
         return new ByteArrayInputStream(unencrypted());
     }
 
-    public String getPassphrase() {
-        return passphrase.getPlainText();
+    public Secret getPassphrase() {
+        return passphrase;
     }
 
     private byte[] unencrypted() throws IOException {

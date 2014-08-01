@@ -1,6 +1,7 @@
 package org.jenkinsci.plugins.androidsigning;
 
 import com.cloudbees.plugins.credentials.CredentialsProvider;
+import com.sun.jdi.connect.Connector;
 import hudson.Extension;
 import hudson.FilePath;
 import hudson.Launcher;
@@ -20,9 +21,7 @@ import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.QueryParameter;
 
 import java.io.*;
-import java.util.Collections;
-import java.util.List;
-import java.util.StringTokenizer;
+import java.util.*;
 
 public class SignArtifactPlugin extends Publisher {
 
@@ -69,36 +68,60 @@ public class SignArtifactPlugin extends Publisher {
                         listener.getLogger().println("[AndroidSignPlugin] - No APKs matching " + rpmGlob);
                     } else {
                         for (FilePath rpmFilePath : matchedApks) {
+
                             ArgumentListBuilder apkSignCommand = new ArgumentListBuilder();
                             String cleanPath = rpmFilePath.toURI().normalize().getPath();
                             String signedPath = cleanPath.replace("unsigned", "signed");
+                            String alignedPath = signedPath.replace("signed", "signed-aligned");
                             FilePath key = keystore.makeTempPath(build.getWorkspace());
 
                             //jarsigner -verbose -sigalg SHA1withRSA -digestalg SHA1 -keystore my-release-key.keystore my_application.apk alias_name
-                            apkSignCommand.add("/usr/bin/jarsigner", "-verbose");
+                            apkSignCommand.add("jarsigner");
                             apkSignCommand.add("-sigalg", "SHA1withRSA");
                             apkSignCommand.add("-digestalg", "SHA1");
                             apkSignCommand.add("-keystore", key.getRemote());
-                            apkSignCommand.add("-storepass", keystore.getPassphrase());
+                            apkSignCommand.add("-storepass");
+                            apkSignCommand.addMasked(keystore.getPassphrase());
                             apkSignCommand.add("-signedjar", signedPath);
                             apkSignCommand.add(cleanPath);
                             apkSignCommand.add(entry.getAlias());
 
                             listener.getLogger().println("[AndroidSignPlugin] - Signing on " + Computer.currentComputer().getDisplayName());
 
-                            //zipalign someday
-
                             Launcher.ProcStarter ps = launcher.new ProcStarter();
-                            ps = ps.cmds(apkSignCommand.toString()).stdout(listener);
+                            ps = ps.cmds(apkSignCommand).stdout(listener);
                             ps = ps.pwd(rpmFilePath.getParent()).envs(build.getEnvironment(listener));
                             Proc proc = launcher.launch(ps);
 
                             int retcode = proc.join();
-                            //key.delete();
+                            key.delete();
                             if (retcode != 0) {
-                                listener.getLogger().println("[AndroidSignPlugin] - Failed signing APKs ...");
+                                listener.getLogger().println("[AndroidSignPlugin] - Failed signing APK");
                                 return false;
                             }
+
+                            Map<String,String> artifactsInsideWorkspace = new LinkedHashMap<String,String>();
+                            artifactsInsideWorkspace.put(signedPath, "signed.apk");
+
+
+                            ///opt/android-sdk/build-tools/20.0.0/zipalign
+                            ArgumentListBuilder zipalignCommand = new ArgumentListBuilder();
+                            zipalignCommand.add("/opt/android-sdk/build-tools/20.0.0/zipalign");
+                            zipalignCommand.add("4");
+                            zipalignCommand.add(signedPath);
+                            zipalignCommand.add(alignedPath);
+
+                            Launcher.ProcStarter ps2 = launcher.new ProcStarter();
+                            ps2 = ps2.cmds(zipalignCommand).stdout(listener);
+                            ps2 = ps2.pwd(rpmFilePath.getParent()).envs(build.getEnvironment(listener));
+                            Proc proc2 = launcher.launch(ps2);
+                            retcode = proc2.join();
+                            if(retcode != 0) {
+                                listener.getLogger().println("[AndroidSignPlugin] - Failed aligning APK");
+                                return true;
+                            }
+                            artifactsInsideWorkspace.put(alignedPath, "aligned.apk");
+                            build.pickArtifactManager().archive(build.getWorkspace(), launcher, listener, artifactsInsideWorkspace);
                         }
 
                     }

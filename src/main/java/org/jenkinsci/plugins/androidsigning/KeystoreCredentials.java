@@ -3,6 +3,7 @@ package org.jenkinsci.plugins.androidsigning;
 import com.cloudbees.plugins.credentials.CredentialsNameProvider;
 import com.cloudbees.plugins.credentials.NameWith;
 import com.cloudbees.plugins.credentials.common.StandardCredentials;
+import hudson.FilePath;
 import hudson.Util;
 
 import javax.annotation.Nonnull;
@@ -16,7 +17,7 @@ public interface KeystoreCredentials extends StandardCredentials {
     InputStream getContent() throws IOException;
     @Nonnull String getPassphrase();
 
-    String getTempPath() throws IOException;
+    public FilePath makeTempPath(FilePath path) throws IOException, InterruptedException;
 
     class NameProvider extends CredentialsNameProvider<KeystoreCredentials> {
         @Override public String getName(KeystoreCredentials c) {

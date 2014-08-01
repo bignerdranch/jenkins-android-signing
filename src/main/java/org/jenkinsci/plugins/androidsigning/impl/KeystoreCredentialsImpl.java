@@ -4,6 +4,7 @@ import com.cloudbees.plugins.credentials.CredentialsDescriptor;
 import com.cloudbees.plugins.credentials.CredentialsScope;
 import com.cloudbees.plugins.credentials.impl.BaseStandardCredentials;
 import hudson.Extension;
+import hudson.FilePath;
 import hudson.util.IOException2;
 import hudson.util.Secret;
 import jenkins.security.CryptoConfidentialKey;
@@ -21,12 +22,12 @@ import java.security.GeneralSecurityException;
 public class KeystoreCredentialsImpl extends BaseStandardCredentials implements KeystoreCredentials{
     private static final CryptoConfidentialKey KEY = new CryptoConfidentialKey(KeystoreCredentialsImpl.class.getName());
 
-    private final @Nonnull Secret password;
+    private final @Nonnull Secret passphrase;
     private final @Nonnull String fileName;
     private final @Nonnull byte[] data;
 
     @DataBoundConstructor
-    public KeystoreCredentialsImpl(@CheckForNull CredentialsScope scope, @CheckForNull String id, @CheckForNull String description, @Nonnull FileItem file, @CheckForNull String fileName, @CheckForNull String data, @CheckForNull String password) throws IOException {
+    public KeystoreCredentialsImpl(@CheckForNull CredentialsScope scope, @CheckForNull String id, @CheckForNull String description, @Nonnull FileItem file, @CheckForNull String fileName, @CheckForNull String data, @CheckForNull String passphrase) throws IOException {
         super(scope, id, description);
         String name = file.getName();
         if (name.length() > 0) {
@@ -41,16 +42,15 @@ public class KeystoreCredentialsImpl extends BaseStandardCredentials implements 
             this.fileName = fileName;
             this.data = Base64.decodeBase64(data);
         }
-        this.password = Secret.fromString(password);
+        this.passphrase = Secret.fromString(passphrase);
     }
 
-    public String getTempPath() throws IOException {
-        File tmp = File.createTempFile("keystore", null);
-        FileOutputStream out = new FileOutputStream(tmp);
+    public FilePath makeTempPath(FilePath path) throws IOException, InterruptedException {
+        FilePath tmp = path.createTempFile("keystore", null);
+        OutputStream out = tmp.write();
         out.write(unencrypted());
         out.close();
-        tmp.deleteOnExit();
-        return tmp.getAbsolutePath();
+        return tmp;
     }
 
     public String getFileName() {
@@ -62,7 +62,7 @@ public class KeystoreCredentialsImpl extends BaseStandardCredentials implements 
     }
 
     public String getPassphrase() {
-        return password.getPlainText();
+        return passphrase.getPlainText();
     }
 
     private byte[] unencrypted() throws IOException {

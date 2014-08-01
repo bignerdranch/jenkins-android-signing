@@ -5,15 +5,11 @@ import hudson.Extension;
 import hudson.FilePath;
 import hudson.Launcher;
 import hudson.Proc;
-import hudson.model.AbstractBuild;
-import hudson.model.AbstractProject;
-import hudson.model.BuildListener;
-import hudson.model.Result;
+import hudson.model.*;
 import hudson.security.ACL;
 import hudson.tasks.BuildStepDescriptor;
 import hudson.tasks.BuildStepMonitor;
 import hudson.tasks.Publisher;
-import hudson.tasks.Recorder;
 import hudson.util.ArgumentListBuilder;
 import hudson.util.FormValidation;
 import hudson.util.ListBoxModel;
@@ -28,7 +24,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.StringTokenizer;
 
-public class SignArtifactPlugin extends Recorder {
+public class SignArtifactPlugin extends Publisher {
 
     private List<Apk> entries = Collections.emptyList();
 
@@ -61,48 +57,44 @@ public class SignArtifactPlugin extends Recorder {
     @Override
     public boolean perform(AbstractBuild<?, ?> build, Launcher launcher, BuildListener listener) throws InterruptedException, IOException {
         if (isPerformDeployment(build)) {
-            listener.getLogger().println("[AndroidSignPlugin] - Starting signing APKs ...");
-
-            for (Apk rpmApk : entries) {
-                StringTokenizer rpmGlobTokenizer = new StringTokenizer(rpmApk.getSelection(), ",");
-                KeystoreCredentials keystore = getKeystore(rpmApk.getKeyStore());
-                listener.getLogger().println("[AndroidSignPlugin] Signing " + rpmGlobTokenizer.countTokens() + " APKs");
+            for (Apk entry : entries) {
+                StringTokenizer rpmGlobTokenizer = new StringTokenizer(entry.getSelection(), ",");
+                KeystoreCredentials keystore = getKeystore(entry.getKeyStore());
+                listener.getLogger().println("[AndroidSignPlugin] - Signing " + rpmGlobTokenizer.countTokens() + " APKs");
                 while (rpmGlobTokenizer.hasMoreTokens()) {
                     String rpmGlob = rpmGlobTokenizer.nextToken();
 
-                    listener.getLogger().println("[AndroidSignPlugin] - Publishing " + rpmGlob);
-
-                    FilePath[] matchedRpms = build.getWorkspace().list(rpmGlob);
-                    if (ArrayUtils.isEmpty(matchedRpms)) {
+                    FilePath[] matchedApks = build.getWorkspace().list(rpmGlob);
+                    if (ArrayUtils.isEmpty(matchedApks)) {
                         listener.getLogger().println("[AndroidSignPlugin] - No APKs matching " + rpmGlob);
                     } else {
-                        for (FilePath rpmFilePath : matchedRpms) {
-                            ArgumentListBuilder rpmSignCommand = new ArgumentListBuilder();
+                        for (FilePath rpmFilePath : matchedApks) {
+                            ArgumentListBuilder apkSignCommand = new ArgumentListBuilder();
+                            String cleanPath = rpmFilePath.toURI().normalize().getPath();
+                            String signedPath = cleanPath.replace("unsigned", "signed");
+                            FilePath key = keystore.makeTempPath(build.getWorkspace());
 
                             //jarsigner -verbose -sigalg SHA1withRSA -digestalg SHA1 -keystore my-release-key.keystore my_application.apk alias_name
-                            rpmSignCommand.add("jarsigner", "-verbose");
-                            rpmSignCommand.add("-sigalg", "SHA1withRSA");
-                            rpmSignCommand.add("-digestalg", "SHA1");
-                            rpmSignCommand.add("-keystore", keystore.getTempPath());
-                            rpmSignCommand.add(rpmFilePath.toURI().normalize().getPath());
-                            rpmSignCommand.add(rpmApk.getAlias());
+                            apkSignCommand.add("/usr/bin/jarsigner", "-verbose");
+                            apkSignCommand.add("-sigalg", "SHA1withRSA");
+                            apkSignCommand.add("-digestalg", "SHA1");
+                            apkSignCommand.add("-keystore", key.getRemote());
+                            apkSignCommand.add("-storepass", keystore.getPassphrase());
+                            apkSignCommand.add("-signedjar", signedPath);
+                            apkSignCommand.add(cleanPath);
+                            apkSignCommand.add(entry.getAlias());
 
-                            String rpmCommandLine = rpmSignCommand.toString();
-                            listener.getLogger().println("[RpmSignPlugin] - Running " + rpmCommandLine);
+                            listener.getLogger().println("[AndroidSignPlugin] - Signing on " + Computer.currentComputer().getDisplayName());
 
-                            ArgumentListBuilder expectCommand = new ArgumentListBuilder();
-                            expectCommand.add("expect", "-");
+                            //zipalign someday
 
                             Launcher.ProcStarter ps = launcher.new ProcStarter();
-                            ps = ps.cmds(expectCommand).stdout(listener);
-                            ps = ps.pwd(build.getWorkspace()).envs(build.getEnvironment(listener));
-
-                            byte[] expectScript = createExpectScriptFile(rpmCommandLine, keystore.getPassphrase());
-                            ByteArrayInputStream is = new ByteArrayInputStream(expectScript);
-                            ps.stdin(is);
-
+                            ps = ps.cmds(apkSignCommand.toString()).stdout(listener);
+                            ps = ps.pwd(rpmFilePath.getParent()).envs(build.getEnvironment(listener));
                             Proc proc = launcher.launch(ps);
+
                             int retcode = proc.join();
+                            //key.delete();
                             if (retcode != 0) {
                                 listener.getLogger().println("[AndroidSignPlugin] - Failed signing APKs ...");
                                 return false;
@@ -129,32 +121,6 @@ public class SignArtifactPlugin extends Recorder {
         }
         return null;
     }
-
-    private byte[] createExpectScriptFile(String signCommand, String passphrase)
-            throws IOException {
-        final ByteArrayOutputStream baos = new ByteArrayOutputStream(512);
-
-        final PrintWriter writer = new PrintWriter(new OutputStreamWriter(baos));
-        try {
-            writer.print("spawn ");
-            writer.println(signCommand);
-            writer.println("expect \"Enter pass phrase: \"");
-            writer.print("send -- \"");
-            writer.print(passphrase);
-            writer.println("\r\"");
-            writer.println("expect eof");
-            writer.println("catch wait rc");
-            writer.println("exit [lindex $rc 3]");
-            writer.println();
-
-            writer.flush();
-        } finally {
-            writer.close();
-        }
-
-        return baos.toByteArray();
-    }
-
 
     @Extension
     @SuppressWarnings("unused")

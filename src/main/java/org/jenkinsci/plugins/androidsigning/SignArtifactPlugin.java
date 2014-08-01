@@ -101,7 +101,7 @@ public class SignArtifactPlugin extends Publisher {
                             }
 
                             Map<String,String> artifactsInsideWorkspace = new LinkedHashMap<String,String>();
-                            artifactsInsideWorkspace.put(signedPath, "signed.apk");
+                            artifactsInsideWorkspace.put(signedPath, stripWorkspace(build.getWorkspace(), signedPath));
 
 
                             ///opt/android-sdk/build-tools/20.0.0/zipalign
@@ -120,7 +120,7 @@ public class SignArtifactPlugin extends Publisher {
                                 listener.getLogger().println("[AndroidSignPlugin] - Failed aligning APK");
                                 return true;
                             }
-                            artifactsInsideWorkspace.put(alignedPath, "aligned.apk");
+                            artifactsInsideWorkspace.put(alignedPath, stripWorkspace(build.getWorkspace(), alignedPath));
                             build.pickArtifactManager().archive(build.getWorkspace(), launcher, listener, artifactsInsideWorkspace);
                         }
 
@@ -133,6 +133,10 @@ public class SignArtifactPlugin extends Publisher {
             listener.getLogger().println("[AndroidSignPlugin] - Skipping signing APKs ...");
         }
         return true;
+    }
+
+    private String stripWorkspace(FilePath ws, String path) {
+        return path.replace(ws.getRemote(), "");
     }
 
     private KeystoreCredentials getKeystore(String keyStoreName) {

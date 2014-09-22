@@ -16,6 +16,7 @@ import hudson.util.FormValidation;
 import hudson.util.ListBoxModel;
 import jenkins.model.Jenkins;
 import org.apache.commons.lang.ArrayUtils;
+import org.apache.commons.lang.StringUtils;
 import org.kohsuke.stapler.AncestorInPath;
 import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.QueryParameter;
@@ -105,8 +106,12 @@ public class SignArtifactPlugin extends Publisher {
 
 
                             ///opt/android-sdk/build-tools/20.0.0/zipalign
+                            String zipalign = build.getEnvironment(listener).get("ANDROID_ZIPALIGN");
+                            if(zipalign == null || StringUtils.isEmpty(zipalign)){
+                                throw new RuntimeException("You must set the environmental variable ANDROID_ZIPALIGN to point to the correct binary");
+                            }
                             ArgumentListBuilder zipalignCommand = new ArgumentListBuilder();
-                            zipalignCommand.add("/opt/android-sdk/build-tools/20.0.0/zipalign");
+                            zipalignCommand.add(zipalign);
                             zipalignCommand.add("4");
                             zipalignCommand.add(signedPath);
                             zipalignCommand.add(alignedPath);

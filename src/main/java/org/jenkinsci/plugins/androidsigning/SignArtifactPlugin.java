@@ -1,7 +1,6 @@
 package org.jenkinsci.plugins.androidsigning;
 
 import com.cloudbees.plugins.credentials.CredentialsProvider;
-import com.sun.jdi.connect.Connector;
 import hudson.Extension;
 import hudson.FilePath;
 import hudson.Launcher;
